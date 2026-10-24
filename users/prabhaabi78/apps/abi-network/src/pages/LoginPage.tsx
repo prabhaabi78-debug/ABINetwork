@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Radio, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('prabhaabi78@gmail.com');
+  const [password, setPassword] = useState('Abi@2026');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,8 +23,12 @@ export default function LoginPage() {
       setError(authError);
       setLoading(false);
     } else {
-      // AuthContext will handle routing based on role
-      setLoading(false);
+      // Navigate based on role
+      if (email === 'prabhaabi78@gmail.com') {
+        navigate('/admin');
+      } else {
+        navigate('/tv');
+      }
     }
   };
 

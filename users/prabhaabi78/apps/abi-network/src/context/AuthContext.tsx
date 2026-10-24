@@ -47,9 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setUser(parsed.user);
-        setProfile(parsed.profile);
-      } catch {}
+        if (parsed.user && parsed.profile) {
+          setUser(parsed.user);
+          setProfile(parsed.profile);
+        }
+      } catch (e) {
+        console.error('Failed to parse session:', e);
+      }
     }
     setLoading(false);
   }, []);
@@ -64,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demoUser);
       setProfile(DEMO_ADMIN);
       setSession({ user: demoUser } as Session);
-      localStorage.setItem('abi_network_session', JSON.stringify({ user: demoUser, profile: DEMO_ADMIN }));
+      localStorage.setItem('abi_network_session', JSON.stringify({ user: { id: 'admin-1', email }, profile: DEMO_ADMIN }));
       return { error: null };
     }
 
@@ -77,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demoUser);
       setProfile(customer);
       setSession({ user: demoUser } as Session);
-      localStorage.setItem('abi_network_session', JSON.stringify({ user: demoUser, profile: customer }));
+      localStorage.setItem('abi_network_session', JSON.stringify({ user: { id: customer.id, email }, profile: customer }));
       return { error: null };
     }
 
