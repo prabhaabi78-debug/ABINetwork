@@ -1,0 +1,8 @@
+{
+  "id": "6adbf8cfd6465304d4b5003a",
+  "schemaVersion": 1,
+  "title": "ABI NETWORK",
+  "description": "Tamil IPTV platform — channel management, customer subscriptions, and live TV streaming",
+  "entry": "src/main.tsx",
+  "bindings": []
+}
