@@ -1,0 +1,363 @@
+import { useEffect, useState } from 'react';
+import { supabase, Subscription, Payment, Profile } from '../../lib/supabase';
+import AdminLayout from '../../components/AdminLayout';
+import {
+  Search,
+  Plus,
+  CreditCard,
+  Calendar,
+  Save,
+  X,
+  AlertCircle,
+  CheckCircle,
+  IndianRupee,
+} from 'lucide-react';
+
+interface SubWithProfile extends Subscription {
+  profiles?: Profile;
+}
+
+interface PaymentWithProfile extends Payment {
+  profiles?: Profile;
+}
+
+export default function SubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = useState<SubWithProfile[]>([]);
+  const [payments, setPayments] = useState<PaymentWithProfile[]>([]);
+  const [customers, setCustomers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'payments'>('subscriptions');
+  const [showSubForm, setShowSubForm] = useState(false);
+  const [showPayForm, setShowPayForm] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const [subForm, setSubForm] = useState({
+    customer_id: '',
+    plan_name: 'Monthly',
+    start_date: new Date().toISOString().split('T')[0],
+    expiry_date: '',
+    status: 'active' as const,
+    payment_id: '',
+  });
+
+  const [payForm, setPayForm] = useState({
+    customer_id: '',
+    amount: 0,
+    method: 'UPI',
+    reference: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  async function fetchData() {
+    const [subsRes, payRes, custRes] = await Promise.all([
+      supabase.from('subscriptions').select('*, profiles(full_name, email)').order('created_at', { ascending: false }),
+      supabase.from('payments').select('*, profiles(full_name, email)').order('paid_at', { ascending: false }),
+      supabase.from('profiles').select('*').eq('role', 'customer').eq('status', 'active'),
+    ]);
+
+    if (subsRes.data) setSubscriptions(subsRes.data as SubWithProfile[]);
+    if (payRes.data) setPayments(payRes.data as PaymentWithProfile[]);
+    if (custRes.data) setCustomers(custRes.data as Profile[]);
+    setLoading(false);
+  }
+
+  async function createSubscription(e: React.FormEvent) {
+    e.preventDefault();
+    const { error } = await supabase.from('subscriptions').insert(subForm);
+    if (error) { setToast({ type: 'error', message: error.message }); return; }
+    setToast({ type: 'success', message: 'Subscription created' });
+    setShowSubForm(false);
+    fetchData();
+  }
+
+  async function updateSubscriptionStatus(id: string, status: string) {
+    const { error } = await supabase.from('subscriptions').update({ status }).eq('id', id);
+    if (error) { setToast({ type: 'error', message: error.message }); return; }
+    setToast({ type: 'success', message: `Subscription ${status}` });
+    fetchData();
+  }
+
+  async function createPayment(e: React.FormEvent) {
+    e.preventDefault();
+    const { error } = await supabase.from('payments').insert({
+      ...payForm,
+      amount: Number(payForm.amount),
+      notes: payForm.notes || null,
+      reference: payForm.reference || null,
+    });
+    if (error) { setToast({ type: 'error', message: error.message }); return; }
+    setToast({ type: 'success', message: 'Payment recorded' });
+    setShowPayForm(false);
+    fetchData();
+  }
+
+  const filteredSubs = subscriptions.filter(s =>
+    s.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    s.profiles?.email?.toLowerCase().includes(search.toLowerCase()) ||
+    s.plan_name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredPays = payments.filter(p =>
+    p.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    p.profiles?.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  return (
+    <AdminLayout>
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg ${
+          toast.type === 'success' ? 'bg-green-500/20 border border-green-500/30 text-green-300' : 'bg-red-500/20 border border-red-500/30 text-red-300'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Subscriptions & Payments</h1>
+          <p className="text-gray-400 mt-1">Manage customer plans and payment records</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowPayForm(true); setShowSubForm(false); }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors"
+          >
+            <IndianRupee className="w-4 h-4" /> Record Payment
+          </button>
+          <button
+            onClick={() => { setShowSubForm(true); setShowPayForm(false); setSubForm({ ...subForm, expiry_date: '' }); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add Subscription
+          </button>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-[#0f1425] border border-gray-800 rounded-xl p-4">
+          <p className="text-sm text-gray-400">Total Revenue</p>
+          <p className="text-2xl font-bold text-white mt-1">₹{totalRevenue.toLocaleString()}</p>
+        </div>
+        <div className="bg-[#0f1425] border border-gray-800 rounded-xl p-4">
+          <p className="text-sm text-gray-400">Active Subscriptions</p>
+          <p className="text-2xl font-bold text-green-400 mt-1">{subscriptions.filter(s => s.status === 'active').length}</p>
+        </div>
+        <div className="bg-[#0f1425] border border-gray-800 rounded-xl p-4">
+          <p className="text-sm text-gray-400">Expired / Cancelled</p>
+          <p className="text-2xl font-bold text-red-400 mt-1">{subscriptions.filter(s => s.status !== 'active').length}</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 bg-[#0f1425] p-1 rounded-lg border border-gray-800 w-fit">
+        <button
+          onClick={() => setActiveTab('subscriptions')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'subscriptions' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Subscriptions
+        </button>
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'payments' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Payments
+        </button>
+      </div>
+
+      {/* Subscription form */}
+      {showSubForm && (
+        <div className="bg-[#0f1425] border border-gray-800 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Add Subscription</h2>
+            <button onClick={() => setShowSubForm(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+          </div>
+          <form onSubmit={createSubscription} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Customer</label>
+              <select value={subForm.customer_id} onChange={e => setSubForm({ ...subForm, customer_id: e.target.value })} required
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                <option value="">Select customer...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.full_name} ({c.email})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Plan</label>
+              <select value={subForm.plan_name} onChange={e => setSubForm({ ...subForm, plan_name: e.target.value })}
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+                <option value="Half-Yearly">Half-Yearly</option>
+                <option value="Yearly">Yearly</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
+              <input type="date" value={subForm.start_date} onChange={e => setSubForm({ ...subForm, start_date: e.target.value })} required
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Expiry Date</label>
+              <input type="date" value={subForm.expiry_date} onChange={e => setSubForm({ ...subForm, expiry_date: e.target.value })} required
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+            </div>
+            <div className="md:col-span-2 flex justify-end">
+              <button type="submit" className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">
+                <Save className="w-4 h-4" /> Create Subscription
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Payment form */}
+      {showPayForm && (
+        <div className="bg-[#0f1425] border border-gray-800 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Record Payment</h2>
+            <button onClick={() => setShowPayForm(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+          </div>
+          <form onSubmit={createPayment} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Customer</label>
+              <select value={payForm.customer_id} onChange={e => setPayForm({ ...payForm, customer_id: e.target.value })} required
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                <option value="">Select customer...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.full_name} ({c.email})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Amount (₹)</label>
+              <input type="number" value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: Number(e.target.value) })} required min="0"
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500" placeholder="299" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Payment Method</label>
+              <select value={payForm.method} onChange={e => setPayForm({ ...payForm, method: e.target.value })}
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                <option value="UPI">UPI</option>
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Card">Card</option>
+                <option value="PhonePe">PhonePe</option>
+                <option value="Google Pay">Google Pay</option>
+                <option value="Paytm">Paytm</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Reference / Transaction ID</label>
+              <input type="text" value={payForm.reference} onChange={e => setPayForm({ ...payForm, reference: e.target.value })}
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500" placeholder="Optional" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-1">Notes</label>
+              <input type="text" value={payForm.notes} onChange={e => setPayForm({ ...payForm, notes: e.target.value })}
+                className="w-full px-3 py-2 bg-[#1a1f35] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500" placeholder="Optional notes" />
+            </div>
+            <div className="md:col-span-2 flex justify-end">
+              <button type="submit" className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
+                <Save className="w-4 h-4" /> Record Payment
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+          className="w-full pl-11 pr-4 py-2.5 bg-[#0f1425] border border-gray-800 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : activeTab === 'subscriptions' ? (
+        filteredSubs.length === 0 ? (
+          <div className="text-center py-12">
+            <CreditCard className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400">No subscriptions found</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredSubs.map(sub => (
+              <div key={sub.id} className="bg-[#0f1425] border border-gray-800 rounded-xl p-4 flex items-center gap-4">
+                <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-white">{sub.profiles?.full_name || 'Unknown'}</h3>
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      sub.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                      sub.status === 'expired' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'
+                    }`}>{sub.status}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {sub.plan_name} • {new Date(sub.start_date).toLocaleDateString()} → {new Date(sub.expiry_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {sub.status !== 'active' && (
+                    <button onClick={() => updateSubscriptionStatus(sub.id, 'active')} className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30">Renew</button>
+                  )}
+                  {sub.status === 'active' && (
+                    <button onClick={() => updateSubscriptionStatus(sub.id, 'cancelled')} className="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">Cancel</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        filteredPays.length === 0 ? (
+          <div className="text-center py-12">
+            <IndianRupee className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400">No payments found</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredPays.map(pay => (
+              <div key={pay.id} className="bg-[#0f1425] border border-gray-800 rounded-xl p-4 flex items-center gap-4">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <IndianRupee className="w-5 h-5 text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white">{pay.profiles?.full_name || 'Unknown'}</h3>
+                    <span className="text-sm font-bold text-green-400">₹{pay.amount.toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {pay.method} {pay.reference ? `• Ref: ${pay.reference}` : ''} • {new Date(pay.paid_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </AdminLayout>
+  );
+}

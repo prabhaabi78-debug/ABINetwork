@@ -1,15 +1,76 @@
-/* The theme tokens (--background, --card, --brand, --canvas, --chart-1…5,
-   light and dark) are injected by @makoai/app-sdk, and the house base and kit
-   styles come from @makoai/app-sdk/ui.css (imported before this file).
-   Override a token here to re-theme; keep app layout below. */
+@import "tailwindcss";
 
-.page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
+/* ============================================================
+   ABI NETWORK — Tamil IPTV Platform
+   Custom styles (dark theme with blue/red accents)
+   ============================================================ */
+
+body {
+  background: #0a0e1a;
+  color: #e5e7eb;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
-.muted {
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Hide scrollbar for category filter */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Focus styles for TV remote navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+button, a {
+  transition: all 0.15s ease;
+}
+
+/* Video player fullscreen */
+video::-webkit-media-controls {
+  display: none !important;
+}
+
+/* Input number spinner removal */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
   margin: 0;
-  color: var(--muted-foreground);
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: white;
 }
