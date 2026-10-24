@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { MOCK_CHANNELS, MOCK_CUSTOMERS, MOCK_SUBSCRIPTIONS, MOCK_PAYMENTS } from '../lib/mockData';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { MOCK_CUSTOMERS } from '../lib/mockData';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface Profile {
@@ -24,9 +24,8 @@ interface AuthContextType {
   canAccess: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo admin account
 const DEMO_ADMIN: Profile = {
   id: 'admin-1',
   email: 'prabhaabi78@gmail.com',
@@ -44,7 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for saved session
     const saved = localStorage.getItem('abi_network_session');
     if (saved) {
       try {
@@ -56,13 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  async function login(email: string, password: string) {
-    // Demo login - accepts any password with 6+ chars
+  const login = useCallback(async (email: string, password: string) => {
     if (password.length < 6) {
       return { error: 'Password must be at least 6 characters' };
     }
 
-    // Admin login
     if (email === 'prabhaabi78@gmail.com') {
       const demoUser = { id: 'admin-1', email } as User;
       setUser(demoUser);
@@ -72,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     }
 
-    // Customer login (demo)
     const customer = MOCK_CUSTOMERS.find(c => c.email === email);
     if (customer) {
       if (customer.status !== 'active') {
@@ -87,20 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return { error: 'Invalid email or password. Try prabhaabi78@gmail.com' };
-  }
+  }, []);
 
-  async function logout() {
+  const logout = useCallback(async () => {
     setUser(null);
     setProfile(null);
     setSession(null);
     localStorage.removeItem('abi_network_session');
-  }
+  }, []);
 
-  async function resetPassword(email: string) {
-    // Demo: just show success
+  const resetPassword = useCallback(async (email: string) => {
     console.log('Password reset requested for:', email);
     return { error: null };
-  }
+  }, []);
 
   const isAdmin = profile?.role === 'admin';
   const canAccess = profile?.status === 'active';
@@ -114,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (context === undefined) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
   return context;
 }
