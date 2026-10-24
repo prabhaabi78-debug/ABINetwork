@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 // ============================================================
 // ABI NETWORK — Supabase Configuration
 // ============================================================
-// Replace these with your actual Supabase project credentials
-// from Settings → API in your Supabase dashboard.
+// Demo mode: Uses mock data for immediate testing.
+// To connect to real Supabase, replace the URL and key below
+// with your actual credentials from Settings → API.
 // ============================================================
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://your-real-project-id.supabase.co';
